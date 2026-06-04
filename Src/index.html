@@ -1,0 +1,807 @@
+﻿<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>MusicPlayer</title>
+    <script src="api.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:      #080810;
+            --bg2:     #0F0F1A;
+            --surface: #13131F;
+            --border:  rgba(124,77,255,0.15);
+            --purple:  #7C4DFF;
+            --purple2: #9C6FFF;
+            --cyan:    #00E5FF;
+            --pink:    #FF4081;
+            --green:   #28C840;
+            --white:   #EEF0FF;
+            --muted:   #6B6B8A;
+        }
+
+        *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+        html, body { width:100%; height:100%; background:var(--bg); color:var(--white);
+            font-family:'DM Sans',sans-serif; overflow:hidden; user-select:none; }
+
+        /* ── Layout ── */
+        .app { display:grid; grid-template-rows:38px 1fr 160px;
+            grid-template-columns:280px 1fr; height:100vh;
+            grid-template-areas:"bar bar" "side main" "player player"; }
+
+        /* ── Titlebar ── */
+        .titlebar { grid-area:bar; -webkit-app-region:drag; background:var(--bg);
+            border-bottom:1px solid var(--border); display:flex;
+            align-items:center; padding:0 16px; gap:12px; }
+        .logo { font-family:'Space Mono',monospace; font-size:13px; font-weight:700;
+            color:var(--purple2); -webkit-app-region:no-drag; }
+        .titlebar-mid { flex:1; text-align:center; font-size:11px; color:var(--muted);
+            letter-spacing:.15em; text-transform:uppercase; font-family:'Space Mono',monospace; }
+        .wbtns { -webkit-app-region:no-drag; display:flex; gap:6px; }
+        .wbtn  { width:12px; height:12px; border-radius:50%; border:none; cursor:pointer; opacity:.7; }
+        .wbtn:hover { opacity:1; }
+        .wbtn.c { background:#FF5F57; }
+        .wbtn.m { background:#FEBC2E; }
+        .wbtn.x { background:#28C840; }
+
+        /* ── Sidebar ── */
+        .sidebar { grid-area:side; background:var(--bg2);
+            border-right:1px solid rgba(255,255,255,.05);
+            display:flex; flex-direction:column; overflow:hidden; }
+
+        .sidebar-top { padding:12px 16px; display:flex; justify-content:space-between;
+            align-items:center; border-bottom:1px solid rgba(255,255,255,.05); }
+        .sidebar-title { font-family:'Space Mono',monospace; font-size:10px; color:var(--muted);
+            letter-spacing:.12em; text-transform:uppercase; }
+        .sidebar-btns { display:flex; gap:6px; }
+
+        /* ── Sort (Strategy) ── */
+        .sort-bar { padding:8px 12px; border-bottom:1px solid rgba(255,255,255,.05);
+            display:flex; align-items:center; gap:8px; }
+        .sort-label { font-size:10px; color:var(--muted); font-family:'Space Mono',monospace;
+            letter-spacing:.08em; text-transform:uppercase; flex-shrink:0; }
+        .sort-select { flex:1; background:var(--bg); border:1px solid var(--border);
+            border-radius:6px; padding:4px 8px; color:var(--white);
+            font-size:11px; outline:none; cursor:pointer; }
+        .sort-select:focus { border-color:var(--purple); }
+
+        /* ── Tabs ── */
+        .tabs { display:flex; border-bottom:1px solid rgba(255,255,255,.05); }
+        .tab  { flex:1; padding:8px; text-align:center; font-size:11px; color:var(--muted);
+            cursor:pointer; transition:.15s; font-family:'Space Mono',monospace;
+            letter-spacing:.08em; text-transform:uppercase; }
+        .tab:hover  { color:var(--white); }
+        .tab.active { color:var(--purple2); border-bottom:2px solid var(--purple); }
+
+        .tab-content { flex:1; overflow-y:auto; padding:8px 10px; }
+        .tab-content::-webkit-scrollbar { width:3px; }
+        .tab-content::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+        /* ── Buttons ── */
+        .icon-btn { width:28px; height:28px; border-radius:6px; border:1px solid var(--border);
+            background:transparent; color:var(--muted); cursor:pointer; font-size:14px;
+            display:flex; align-items:center; justify-content:center; transition:.2s; }
+        .icon-btn:hover { background:rgba(124,77,255,.15); color:var(--purple2); }
+
+        .btn { padding:7px 14px; border-radius:8px; border:none; cursor:pointer;
+            font-size:12px; font-family:'DM Sans',sans-serif; transition:.2s; }
+        .btn-primary { background:var(--purple); color:white; }
+        .btn-primary:hover { background:var(--purple2); }
+        .btn-ghost { background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,.1); }
+        .btn-ghost:hover { color:var(--white); }
+        .btn-sm { padding:4px 10px; font-size:11px; }
+
+        /* ── Playlist items ── */
+        .pitem { display:flex; align-items:center; gap:10px; padding:9px 10px;
+            border-radius:7px; cursor:pointer; transition:.15s; position:relative; }
+        .pitem:hover  { background:rgba(255,255,255,.04); }
+        .pitem.active { background:rgba(124,77,255,.1); }
+        .pitem.active::before { content:''; position:absolute; left:0; top:20%;
+            width:3px; height:60%; background:var(--purple);
+            border-radius:0 2px 2px 0; }
+        .pnum    { width:22px; font-family:'Space Mono',monospace; font-size:10px;
+            color:var(--muted); text-align:right; flex-shrink:0; }
+        .pitem.active .pnum { color:var(--purple2); }
+        .pinfo   { flex:1; min-width:0; }
+        .ptitle  { font-size:13px; font-weight:500; white-space:nowrap;
+            overflow:hidden; text-overflow:ellipsis; }
+        .pitem.active .ptitle { color:var(--purple2); }
+        .partist { font-size:11px; color:var(--muted); white-space:nowrap;
+            overflow:hidden; text-overflow:ellipsis; }
+        .pdur { font-family:'Space Mono',monospace; font-size:10px;
+            color:var(--muted); flex-shrink:0; }
+
+        /* ── Playlist group ── */
+        .pl-group  { margin-bottom:6px; }
+        .pl-header { display:flex; align-items:center; justify-content:space-between;
+            padding:8px 10px; border-radius:7px; cursor:pointer; transition:.15s; }
+        .pl-header:hover  { background:rgba(255,255,255,.04); }
+        .pl-header.active { background:rgba(124,77,255,.08); }
+        .pl-dot   { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+        .pl-name  { font-size:13px; font-weight:500; flex:1; margin-left:8px; }
+        .pl-count { font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; }
+
+        /* ── Main ── */
+        .main { grid-area:main; display:flex; flex-direction:column;
+            position:relative; overflow:hidden; }
+        .main::before { content:''; position:absolute; width:400px; height:400px;
+            background:var(--purple); border-radius:50%; filter:blur(90px);
+            opacity:.07; top:-120px; right:-80px; pointer-events:none; }
+        .main::after  { content:''; position:absolute; width:280px; height:280px;
+            background:var(--cyan); border-radius:50%; filter:blur(80px);
+            opacity:.06; bottom:-80px; left:-60px; pointer-events:none; }
+
+        .main-tabs { display:flex; border-bottom:1px solid rgba(255,255,255,.05);
+            position:relative; z-index:1; background:var(--bg); }
+        .main-tab  { padding:10px 20px; font-size:12px; color:var(--muted); cursor:pointer;
+            transition:.15s; font-family:'Space Mono',monospace;
+            letter-spacing:.08em; text-transform:uppercase; }
+        .main-tab:hover  { color:var(--white); }
+        .main-tab.active { color:var(--purple2); border-bottom:2px solid var(--purple); }
+
+        .main-content { flex:1; overflow-y:auto; position:relative; z-index:1; }
+        .main-content::-webkit-scrollbar { width:3px; }
+        .main-content::-webkit-scrollbar-thumb { background:var(--border); }
+
+        /* ── Now Playing ── */
+        .nowplaying { display:flex; flex-direction:column; align-items:center;
+            gap:24px; padding:40px; animation:fadeUp .4s ease; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
+
+        .art { width:200px; height:200px; border-radius:18px; background:var(--surface);
+            display:flex; align-items:center; justify-content:center; font-size:72px;
+            box-shadow:0 20px 50px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.06),
+            0 0 50px rgba(124,77,255,.12); transition:.3s; }
+        .art:hover { transform:scale(1.02) translateY(-4px); }
+        .art.spin  { animation:spin 8s linear infinite; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+
+        .meta        { text-align:center; }
+        .meta-title  { font-family:'Space Mono',monospace; font-size:20px; font-weight:700;
+            background:linear-gradient(135deg,var(--white),var(--purple2));
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .meta-artist { font-size:14px; color:var(--muted); margin-top:6px; font-weight:300; }
+        .meta-genre  { font-family:'Space Mono',monospace; font-size:10px; color:var(--purple2);
+            margin-top:8px; letter-spacing:.1em; text-transform:uppercase;
+            border:1px solid rgba(124,77,255,.3); padding:2px 8px;
+            border-radius:4px; display:inline-block; }
+
+        .empty      { display:flex; flex-direction:column; align-items:center;
+            justify-content:center; height:100%; color:var(--muted); }
+        .empty-icon { font-size:56px; opacity:.25; margin-bottom:16px; }
+        .empty-text { font-family:'Space Mono',monospace; font-size:16px; }
+        .empty-sub  { font-size:13px; margin-top:8px; opacity:.7; }
+
+        /* ── Patterns Panel ── */
+        .patterns-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:20px; }
+        .pattern-card  { background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; padding:16px; }
+        .pattern-type  { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:.12em;
+            text-transform:uppercase; margin-bottom:6px; }
+        .pattern-name  { font-size:14px; font-weight:500; margin-bottom:6px; }
+        .pattern-desc  { font-size:12px; color:var(--muted); line-height:1.5; margin-bottom:10px; }
+        .pattern-demo  { font-size:11px; color:var(--muted); background:var(--bg2);
+            border-radius:6px; padding:10px; font-family:'Space Mono',monospace;
+            line-height:1.6; white-space:pre; margin-bottom:10px; }
+        .pattern-btns  { display:flex; gap:6px; flex-wrap:wrap; }
+
+        /* ── Theme Panel ── */
+        .theme-section { padding:20px; }
+        .section-title { font-family:'Space Mono',monospace; font-size:11px; color:var(--muted);
+            letter-spacing:.1em; text-transform:uppercase; margin-bottom:12px; }
+        .theme-cards   { display:flex; gap:12px; margin-bottom:24px; }
+        .theme-card    { flex:1; border:2px solid var(--border); border-radius:10px;
+            padding:16px; cursor:pointer; transition:.2s; }
+        .theme-card:hover  { border-color:rgba(124,77,255,.4); }
+        .theme-card.active { border-color:var(--purple); }
+        .theme-preview { width:100%; height:60px; border-radius:6px; margin-bottom:10px;
+            display:flex; align-items:center; justify-content:center; font-size:20px; }
+        .theme-name    { font-size:13px; font-weight:500; margin-bottom:4px; }
+        .theme-fonts   { font-size:11px; color:var(--muted); }
+        .color-dots    { display:flex; gap:6px; margin-top:8px; }
+        .color-dot     { width:16px; height:16px; border-radius:50%; }
+
+        /* ── Builder Panel ── */
+        .builder-section { padding:20px; }
+        .field { margin-bottom:12px; }
+        .field label { display:block; font-size:11px; color:var(--muted); margin-bottom:6px;
+            font-family:'Space Mono',monospace; letter-spacing:.08em; text-transform:uppercase; }
+        .field input, .field select {
+            width:100%; background:var(--bg2); border:1px solid var(--border);
+            border-radius:8px; padding:9px 12px; color:var(--white);
+            font-family:'DM Sans',sans-serif; font-size:13px; outline:none; }
+        .field input:focus, .field select:focus { border-color:var(--purple); }
+        .field select option { background:var(--bg2); }
+
+        /* ── Player ── */
+        .player { grid-area:player; background:var(--surface);
+            border-top:1px solid rgba(255,255,255,.05);
+            padding:12px 28px; display:flex; flex-direction:column;
+            gap:10px; position:relative; }
+        .player.playing::before { content:''; position:absolute; top:0; left:15%; right:15%;
+            height:1px; background:linear-gradient(90deg,transparent,var(--purple),transparent);
+            opacity:.5; }
+
+        /* Progress */
+        .progress { display:flex; align-items:center; gap:10px; }
+        .time     { font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); min-width:34px; }
+        .time.r   { text-align:right; }
+        .bar      { flex:1; height:4px; background:var(--bg); border-radius:2px; cursor:pointer; }
+        .fill     { height:100%; background:linear-gradient(90deg,var(--purple),var(--purple2));
+            border-radius:2px; transition:width .5s linear; position:relative; }
+        .fill::after { content:''; position:absolute; right:-5px; top:-4px; width:12px; height:12px;
+            background:white; border-radius:50%; opacity:0; transition:.2s;
+            box-shadow:0 0 8px rgba(124,77,255,.8); }
+        .bar:hover .fill::after { opacity:1; }
+
+        /* Controls row 1 */
+        .controls { display:flex; align-items:center; justify-content:space-between; }
+        .ctrls-left, .ctrls-right { display:flex; align-items:center; gap:8px; flex:1; }
+        .ctrls-right  { justify-content:flex-end; }
+        .ctrls-center { display:flex; align-items:center; gap:14px; }
+
+        .cbtn { width:34px; height:34px; border-radius:50%; border:none; background:transparent;
+            color:var(--muted); cursor:pointer; font-size:16px; transition:.15s; }
+        .cbtn:hover { color:var(--white); }
+        .cbtn.on    { color:var(--purple2); }
+
+        .playbtn { width:50px; height:50px; border-radius:50%; border:none; background:var(--purple);
+            color:white; cursor:pointer; font-size:18px; transition:.2s;
+            box-shadow:0 4px 18px rgba(124,77,255,.4); }
+        .playbtn:hover   { transform:scale(1.06); }
+        .playbtn.playing { box-shadow:0 4px 24px rgba(124,77,255,.6); }
+
+        .vol      { display:flex; align-items:center; gap:8px; }
+        .vol-icon { font-size:15px; color:var(--muted); }
+
+        input[type=range] { -webkit-appearance:none; height:3px; border-radius:2px;
+            background:var(--bg); outline:none; cursor:pointer; width:80px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:11px; height:11px;
+            border-radius:50%; background:var(--purple2); transition:.15s; }
+        input[type=range]::-webkit-slider-thumb:hover { transform:scale(1.3); }
+
+        .mode-badge { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:.1em;
+            text-transform:uppercase; padding:3px 7px; border-radius:4px;
+            background:rgba(124,77,255,.1); color:var(--purple2);
+            border:1px solid rgba(124,77,255,.2); }
+
+        /* Controls row 2 — Command + Memento */
+        .controls2 { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .controls2-left  { display:flex; align-items:center; gap:6px; flex:1; }
+        .controls2-right { display:flex; align-items:center; gap:6px; justify-content:flex-end; flex:1; }
+        .controls2-center { display:flex; align-items:center; gap:6px; }
+
+        .cmd-btn { display:flex; align-items:center; gap:5px; padding:5px 10px;
+            border-radius:7px; border:1px solid var(--border); background:transparent;
+            color:var(--muted); cursor:pointer; font-size:11px;
+            font-family:'Space Mono',monospace; transition:.2s; }
+        .cmd-btn:hover   { background:rgba(124,77,255,.1); color:var(--purple2); border-color:rgba(124,77,255,.3); }
+        .cmd-btn:disabled { opacity:.3; cursor:not-allowed; }
+        .cmd-btn.save    { border-color:rgba(0,229,255,.2); color:var(--cyan); }
+        .cmd-btn.save:hover { background:rgba(0,229,255,.08); }
+        .cmd-btn.restore { border-color:rgba(40,200,64,.2); color:var(--green); }
+        .cmd-btn.restore:hover { background:rgba(40,200,64,.08); }
+
+        .history-badge { font-family:'Space Mono',monospace; font-size:9px; color:var(--muted);
+            background:var(--bg2); padding:3px 7px; border-radius:4px;
+            border:1px solid var(--border2); }
+
+        /* ── Observer Log ── */
+        .obs-log { position:fixed; bottom:170px; right:16px; width:300px;
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; z-index:500; display:none; }
+        .obs-log.open { display:block; animation:slideUp .2s ease; }
+        @keyframes slideUp { from{opacity:0;transform:translateY(8px)} }
+        .obs-log-header { display:flex; align-items:center; justify-content:space-between;
+            padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.05); }
+        .obs-log-title  { font-family:'Space Mono',monospace; font-size:11px; color:var(--purple2); }
+        .obs-log-body   { padding:8px; max-height:200px; overflow-y:auto; }
+        .obs-log-body::-webkit-scrollbar { width:3px; }
+        .obs-log-body::-webkit-scrollbar-thumb { background:var(--border); }
+        .obs-entry { font-family:'Space Mono',monospace; font-size:10px; padding:4px 6px;
+            border-radius:4px; margin-bottom:3px; line-height:1.4; }
+        .obs-entry.play  { background:rgba(124,77,255,.1); color:var(--purple2); }
+        .obs-entry.pause { background:rgba(254,188,46,.08); color:#FEBC2E; }
+        .obs-entry.stop  { background:rgba(255,95,87,.08); color:#FF5F57; }
+
+        /* ── Snapshots panel ── */
+        .snapshots-panel { position:fixed; bottom:170px; left:296px; width:280px;
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; z-index:500; display:none; }
+        .snapshots-panel.open { display:block; animation:slideUp .2s ease; }
+        .snap-header { display:flex; align-items:center; justify-content:space-between;
+            padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.05); }
+        .snap-title  { font-family:'Space Mono',monospace; font-size:11px; color:var(--cyan); }
+        .snap-body   { padding:8px; max-height:180px; overflow-y:auto; }
+        .snap-item   { font-family:'Space Mono',monospace; font-size:10px; padding:6px 8px;
+            border-radius:6px; margin-bottom:4px; background:var(--bg2);
+            border:1px solid var(--border); cursor:pointer; transition:.15s; }
+        .snap-item:hover { border-color:rgba(0,229,255,.3); color:var(--cyan); }
+
+        /* ── Modal ── */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7);
+            z-index:1000; align-items:center; justify-content:center; }
+        .modal-overlay.open { display:flex; }
+        .modal { background:var(--surface); border:1px solid rgba(124,77,255,.3);
+            border-radius:12px; padding:24px; width:340px; }
+        .modal-title  { font-family:'Space Mono',monospace; font-size:13px; color:var(--purple2); margin-bottom:20px; }
+        .modal-footer { display:flex; gap:8px; justify-content:flex-end; margin-top:20px; }
+
+        /* ── Toast ── */
+        .toast { position:fixed; bottom:175px; left:50%; transform:translateX(-50%);
+            background:var(--surface); border:1px solid var(--border); border-radius:8px;
+            padding:8px 16px; font-size:12px; color:var(--white); opacity:0; transition:.3s;
+            font-family:'Space Mono',monospace; z-index:2000; white-space:nowrap; }
+        .toast.show { opacity:1; }
+
+        /* ── Tag ── */
+        .tag { display:inline-block; padding:2px 8px; border-radius:4px;
+            font-family:'Space Mono',monospace; font-size:10px;
+            letter-spacing:.08em; text-transform:uppercase; }
+        .tag-creational  { background:rgba(0,229,255,.08);  color:var(--cyan);   border:1px solid rgba(0,229,255,.2); }
+        .tag-structural  { background:rgba(255,64,129,.08); color:var(--pink);   border:1px solid rgba(255,64,129,.2); }
+        .tag-behavioral  { background:rgba(40,200,64,.08);  color:var(--green);  border:1px solid rgba(40,200,64,.2); }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- TITLEBAR -->
+    <header class="titlebar">
+        <span class="logo">♫ WAVELENGTH</span>
+        <span class="titlebar-mid"></span>
+        <div class="wbtns">
+            <button class="wbtn c" onclick="window.electron?.close()"></button>
+            <button class="wbtn m" onclick="window.electron?.minimize()"></button>
+            <button class="wbtn x"></button>
+        </div>
+    </header>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-top">
+            <span class="sidebar-title">Library</span>
+            <div class="sidebar-btns">
+                <button class="icon-btn" onclick="showAddFiles()" title="Adauga fisiere">＋</button>
+                <button class="icon-btn" onclick="showCreatePlaylist()" title="Playlist nou">⊞</button>
+            </div>
+        </div>
+
+        <!-- STRATEGY: Sort bar -->
+        <div class="sort-bar">
+            <span class="sort-label">Sort</span>
+            <select class="sort-select" id="sort-select" onchange="sortPlaylist(this.value)">
+                <option value="">— Default —</option>
+                <option value="title">Title A→Z</option>
+                <option value="artist">Artist A→Z</option>
+                <option value="duration">Duration</option>
+                <option value="playcount">Most Played</option>
+            </select>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchSideTab('tracks')"    id="tab-tracks">Tracks</div>
+            <div class="tab"        onclick="switchSideTab('playlists')" id="tab-playlists">Playlists</div>
+        </div>
+
+        <div class="tab-content" id="side-tracks">
+            <div id="track-list">
+                <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">
+                    Se incarca...
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="side-playlists" style="display:none">
+            <div id="playlist-list">
+                <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">
+                    Niciun playlist. Apasa ⊞
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+        <div class="main-tabs">
+            <div class="main-tab active" onclick="switchMainTab('player')"   id="mtab-player">▶ Player</div>
+            <div class="main-tab"        onclick="switchMainTab('patterns')" id="mtab-patterns">⎈ Patterns</div>
+            <div class="main-tab"        onclick="switchMainTab('theme')"    id="mtab-theme">🎨 Theme</div>
+            <div class="main-tab"        onclick="switchMainTab('builder')"  id="mtab-builder">⚙ Playlist</div>
+        </div>
+
+        <div class="main-content">
+
+            <!-- TAB: PLAYER -->
+            <div id="view-player">
+                <div class="empty" id="empty" style="height:380px">
+                    <div class="empty-icon">🎵</div>
+                    <p class="empty-text">Niciun track selectat</p>
+                    <p class="empty-sub">Apasa ＋ sau alege un track</p>
+                </div>
+                <div class="nowplaying" id="nowplaying" style="display:none">
+                    <div class="art" id="art">🎵</div>
+                    <div class="meta">
+                        <div class="meta-title"  id="mtitle">—</div>
+                        <div class="meta-artist" id="martist">—</div>
+                        <div class="meta-genre"  id="mgenre">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: PATTERNS -->
+            <div id="view-patterns" style="display:none">
+                <div class="patterns-grid">
+
+                    <!-- Factory Method -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--cyan)">Creational</div>
+                        <div class="pattern-name">Factory Method</div>
+                        <div class="pattern-desc">Creeaza Track-uri din surse diferite fara a cunoaste tipul concret.</div>
+                        <div class="pattern-demo" id="demo-factory">FileTrackFactory.Create(path)
+                            → Track { Title, FilePath }</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="demoFactory()">Demo</button>
+                        </div>
+                    </div>
+
+                    <!-- Abstract Factory -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--cyan)">Creational</div>
+                        <div class="pattern-name">Abstract Factory</div>
+                        <div class="pattern-desc">Creeaza familii compatibile de obiecte — teme vizuale.</div>
+                        <div class="pattern-demo" id="demo-absfactory">DarkThemeFactory
+                            → DarkColors + DarkFonts</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="switchMainTab('theme')">Vezi Theme</button>
+                        </div>
+                    </div>
+
+                    <!-- Builder -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--cyan)">Creational</div>
+                        <div class="pattern-name">Builder</div>
+                        <div class="pattern-desc">Construieste un Playlist pas cu pas cu validare.</div>
+                        <div class="pattern-demo">PlaylistBuilder
+                            .WithName("Favorites")
+                            .WithMode(Shuffle)
+                            .Build()</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="switchMainTab('builder')">Incearca</button>
+                        </div>
+                    </div>
+
+                    <!-- Prototype -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--cyan)">Creational</div>
+                        <div class="pattern-name">Prototype</div>
+                        <div class="pattern-desc">Cloneaza un Track existent cu ID nou, fara PlayCount.</div>
+                        <div class="pattern-demo" id="demo-prototype">Selecteaza un track
+                            apoi apasa Clone</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="demoPrototype()">Clone Track</button>
+                        </div>
+                    </div>
+
+                    <!-- Bridge -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--pink)">Structural</div>
+                        <div class="pattern-name">Bridge</div>
+                        <div class="pattern-desc">Separa abstractia AudioEngine de implementarea backend-ului audio.</div>
+                        <div class="pattern-demo">AudioEngine (abstraction)
+                            └── DummyBackend
+                            └── NAudioBackend</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="demoBridge()">Test Play</button>
+                        </div>
+                    </div>
+
+                    <!-- Proxy -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--pink)">Structural</div>
+                        <div class="pattern-name">Proxy</div>
+                        <div class="pattern-desc">Cache transparent la citirea metadatelor din fisiere.</div>
+                        <div class="pattern-demo" id="demo-proxy">Prima citire  → MISS
+                            A doua citire → HIT</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="demoProxy()">Test Cache</button>
+                        </div>
+                    </div>
+
+                    <!-- Flyweight -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--pink)">Structural</div>
+                        <div class="pattern-name">Flyweight</div>
+                        <div class="pattern-desc">Partajeaza Genre+Artist intre track-uri din acelasi pool.</div>
+                        <div class="pattern-demo" id="demo-flyweight">Pool: se calculeaza...</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="demoFlyweight()">Vezi Pool</button>
+                        </div>
+                    </div>
+
+                    <!-- Decorator -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--pink)">Structural</div>
+                        <div class="pattern-name">Decorator</div>
+                        <div class="pattern-desc">Logging, VolumeNormalizer si FadeIn stacked peste AudioEngine.</div>
+                        <div class="pattern-demo" id="demo-decorator">LoggingDecorator
+                            → VolumeNormalizer
+                            → FadeInDecorator
+                            → AudioEngine</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="demoDecorator()">Test Stack</button>
+                        </div>
+                    </div>
+
+                    <!-- Strategy -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--green)">Behavioral</div>
+                        <div class="pattern-name">Strategy</div>
+                        <div class="pattern-desc">Algoritm de sortare schimbabil fara a modifica PlayerService.</div>
+                        <div class="pattern-demo" id="demo-strategy">Alege sortarea din
+                            sidebar → Sort dropdown</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="demoStrategy('title')">Sort Title</button>
+                            <button class="btn btn-primary btn-sm" onclick="demoStrategy('artist')">Sort Artist</button>
+                        </div>
+                    </div>
+
+                    <!-- Observer -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--green)">Behavioral</div>
+                        <div class="pattern-name">Observer</div>
+                        <div class="pattern-desc">NowPlaying, PlayCount si Logger notificate la fiecare eveniment.</div>
+                        <div class="pattern-demo" id="demo-observer">3 observeri activi:
+                            NowPlayingObserver
+                            PlayCountObserver
+                            LoggerObserver</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="toggleObsLog()">Vezi Log</button>
+                        </div>
+                    </div>
+
+                    <!-- Command -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--green)">Behavioral</div>
+                        <div class="pattern-name">Command</div>
+                        <div class="pattern-desc">Play/Pause/Stop/Skip ca obiecte cu Undo. Buton Undo in player bar.</div>
+                        <div class="pattern-demo" id="demo-command">History: gol</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="loadHistory()">Vezi History</button>
+                            <button class="btn btn-ghost btn-sm"   onclick="doUndo()">Undo</button>
+                        </div>
+                    </div>
+
+                    <!-- Memento -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--green)">Behavioral</div>
+                        <div class="pattern-name">Memento</div>
+                        <div class="pattern-desc">Salveaza si restaureaza starea playerului. Butoane Save/Restore in player bar.</div>
+                        <div class="pattern-demo" id="demo-memento">Snapshots: 0</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="doSave()">Save State</button>
+                            <button class="btn btn-ghost btn-sm"   onclick="doRestore()">Restore</button>
+                        </div>
+                    </div>
+
+                    <!-- Iterator -->
+                    <div class="pattern-card">
+                        <div class="pattern-type" style="color:var(--green)">Behavioral</div>
+                        <div class="pattern-name">Iterator</div>
+                        <div class="pattern-desc">Parcurge playlist-ul secvential sau shuffle fara a expune lista interna.</div>
+                        <div class="pattern-demo" id="demo-iterator">PlaylistIterator
+                            ShuffleIterator</div>
+                        <div class="pattern-btns">
+                            <button class="btn btn-primary btn-sm" onclick="demoIterator(false)">Normal</button>
+                            <button class="btn btn-primary btn-sm" onclick="demoIterator(true)">Shuffle</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- TAB: THEME -->
+            <div id="view-theme" style="display:none">
+                <div class="theme-section">
+                    <div class="section-title">Teme Vizuale</div>
+                    <div class="theme-cards">
+                        <div class="theme-card active" id="theme-dark" onclick="applyTheme('dark')">
+                            <div class="theme-preview" style="background:#080810">🌙</div>
+                            <div class="theme-name">Dark Neon</div>
+                            <div class="theme-fonts">Space Mono + DM Sans</div>
+                            <div class="color-dots">
+                                <div class="color-dot" style="background:#080810;border:1px solid #333"></div>
+                                <div class="color-dot" style="background:#7C4DFF"></div>
+                                <div class="color-dot" style="background:#00E5FF"></div>
+                            </div>
+                        </div>
+                        <div class="theme-card" id="theme-light" onclick="applyTheme('light')">
+                            <div class="theme-preview" style="background:#F5F5FA">☀️</div>
+                            <div class="theme-name">Arctic Light</div>
+                            <div class="theme-fonts">Playfair Display + Source Sans</div>
+                            <div class="color-dots">
+                                <div class="color-dot" style="background:#F5F5FA;border:1px solid #ccc"></div>
+                                <div class="color-dot" style="background:#5C35CC"></div>
+                                <div class="color-dot" style="background:#1A1A2E"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="section-title">Tema curenta</div>
+                    <div id="theme-info" style="background:var(--surface); border-radius:10px;
+               padding:16px; font-family:'Space Mono',monospace; font-size:12px;
+               line-height:2; border:1px solid var(--border);">
+                        Factory: DarkThemeFactory
+                        Background: #080810
+                        Accent: #7C4DFF
+                        Font: Space Mono + DM Sans
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: BUILDER -->
+            <div id="view-builder" style="display:none">
+                <div class="builder-section">
+                    <div class="section-title">Creeaza Playlist</div>
+                    <div class="field">
+                        <label>Nume Playlist *</label>
+                        <input id="bl-name" type="text" placeholder="Ex: Favorite Rock Songs">
+                    </div>
+                    <div class="field">
+                        <label>Descriere</label>
+                        <input id="bl-desc" type="text" placeholder="Optional...">
+                    </div>
+                    <div class="field">
+                        <label>Mod de redare</label>
+                        <select id="bl-mode">
+                            <option value="Normal">Normal</option>
+                            <option value="Shuffle">Shuffle</option>
+                            <option value="RepeatOne">Repeat One</option>
+                            <option value="RepeatAll">Repeat All</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Culoare</label>
+                        <div style="display:flex; gap:8px;">
+                            <div onclick="selectColor('#7C4DFF')" style="width:28px;height:28px;background:#7C4DFF;
+                   border-radius:6px;cursor:pointer;border:2px solid white;"></div>
+                            <div onclick="selectColor('#FF4081')" style="width:28px;height:28px;background:#FF4081;
+                   border-radius:6px;cursor:pointer;"></div>
+                            <div onclick="selectColor('#00E5FF')" style="width:28px;height:28px;background:#00E5FF;
+                   border-radius:6px;cursor:pointer;"></div>
+                            <div onclick="selectColor('#28C840')" style="width:28px;height:28px;background:#28C840;
+                   border-radius:6px;cursor:pointer;"></div>
+                            <div onclick="selectColor('#FEBC2E')" style="width:28px;height:28px;background:#FEBC2E;
+                   border-radius:6px;cursor:pointer;"></div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:4px;">
+                        <button class="btn btn-primary" onclick="buildPlaylist()">⚙ Build Playlist</button>
+                        <button class="btn btn-ghost"   onclick="resetBuilder()">Reset</button>
+                    </div>
+                    <div id="builder-result" style="display:none; margin-top:16px;
+               background:var(--surface); border:1px solid rgba(124,77,255,.3);
+               border-radius:8px; padding:14px; font-family:'Space Mono',monospace;
+               font-size:12px; line-height:2; white-space:pre;"></div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- PLAYER BAR -->
+    <footer class="player" id="playerbar">
+        <!-- Progress -->
+        <div class="progress">
+            <span class="time r" id="tpos">0:00</span>
+            <div class="bar" id="bar">
+                <div class="fill" id="fill" style="width:0%"></div>
+            </div>
+            <span class="time" id="tdur">0:00</span>
+        </div>
+
+        <!-- Controls Row 1 — Play/Pause/Skip + Volume + Mode -->
+        <div class="controls">
+            <div class="ctrls-left">
+                <button class="cbtn" id="btnShuffle" onclick="setMode('Shuffle')" title="Shuffle">⇄</button>
+                <div class="vol">
+                    <span class="vol-icon" id="vicon">🔊</span>
+                    <input type="range" id="vol" min="0" max="100" value="80" oninput="setVol(this.value)">
+                </div>
+            </div>
+            <div class="ctrls-center">
+                <button class="cbtn" onclick="sendCmd('previous')">⏮</button>
+                <button class="playbtn" id="playbtn" onclick="togglePlay()">▶</button>
+                <button class="cbtn" onclick="sendCmd('next')">⏭</button>
+            </div>
+            <div class="ctrls-right">
+                <button class="cbtn" id="btnRepeat" onclick="setMode('RepeatAll')">↻</button>
+                <span class="mode-badge" id="modebadge">NORMAL</span>
+            </div>
+        </div>
+
+        <!-- Controls Row 2 — Command + Memento + Observer -->
+        <div class="controls2">
+            <div class="controls2-left">
+                <!-- COMMAND: Undo -->
+                <button class="cmd-btn" id="btnUndo" onclick="doUndo()" title="Undo ultima comanda" disabled>
+                    ↩ Undo
+                </button>
+                <!-- COMMAND: History -->
+                <button class="cmd-btn" onclick="loadHistory()" title="Istoric comenzi">
+                    📋 History
+                </button>
+            </div>
+
+            <div class="controls2-center">
+                <!-- OBSERVER: Log -->
+                <button class="cmd-btn" onclick="toggleObsLog()" title="Observer Log">
+                    👁 Observer
+                </button>
+            </div>
+
+            <div class="controls2-right">
+                <!-- MEMENTO: Save -->
+                <button class="cmd-btn save" onclick="doSave()" title="Salveaza starea">
+                    💾 Save
+                </button>
+                <!-- MEMENTO: Restore -->
+                <button class="cmd-btn restore" id="btnRestore" onclick="toggleSnapshots()" title="Restaureaza starea" disabled>
+                    ⏪ Restore
+                </button>
+            </div>
+        </div>
+    </footer>
+
+</div>
+
+<!-- OBSERVER LOG PANEL -->
+<div class="obs-log" id="obs-log">
+    <div class="obs-log-header">
+        <span class="obs-log-title">👁 Observer Log</span>
+        <button class="icon-btn" onclick="toggleObsLog()" style="width:22px;height:22px;font-size:12px">✕</button>
+    </div>
+    <div class="obs-log-body" id="obs-log-body">
+        <div style="color:var(--muted);font-size:11px;font-family:'Space Mono',monospace;padding:4px">
+            Niciun eveniment inca...
+        </div>
+    </div>
+</div>
+
+<!-- SNAPSHOTS PANEL -->
+<div class="snapshots-panel" id="snapshots-panel">
+    <div class="snap-header">
+        <span class="snap-title">💾 Snapshots</span>
+        <button class="icon-btn" onclick="toggleSnapshots()" style="width:22px;height:22px;font-size:12px">✕</button>
+    </div>
+    <div class="snap-body" id="snap-body">
+        <div style="color:var(--muted);font-size:11px;font-family:'Space Mono',monospace;padding:4px">
+            Niciun snapshot salvat...
+        </div>
+    </div>
+</div>
+
+<!-- MODAL PLAYLIST -->
+<div class="modal-overlay" id="modal-playlist">
+    <div class="modal">
+        <div class="modal-title">⊞ NOU PLAYLIST</div>
+        <div class="field">
+            <label>Nume *</label>
+            <input id="modal-name" type="text" placeholder="Numele playlist-ului...">
+        </div>
+        <div class="field">
+            <label>Descriere</label>
+            <input id="modal-desc" type="text" placeholder="Optional...">
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost"   onclick="closeModal('modal-playlist')">Anuleaza</button>
+            <button class="btn btn-primary" onclick="createPlaylist()">Creeaza</button>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="renderer.js"></script>
+</body>
+</html>
