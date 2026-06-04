@@ -1,0 +1,56 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "MusicPlayer.Infrastructure/1.0.0": {
+        "dependencies": {
+          "MusicPlayer.Application": "1.0.0",
+          "MusicPlayer.Domain": "1.0.0"
+        },
+        "runtime": {
+          "MusicPlayer.Infrastructure.dll": {}
+        }
+      },
+      "MusicPlayer.Application/1.0.0": {
+        "dependencies": {
+          "MusicPlayer.Domain": "1.0.0"
+        },
+        "runtime": {
+          "MusicPlayer.Application.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "MusicPlayer.Domain/1.0.0": {
+        "runtime": {
+          "MusicPlayer.Domain.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "MusicPlayer.Infrastructure/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "MusicPlayer.Application/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "MusicPlayer.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

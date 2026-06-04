@@ -1,0 +1,12 @@
+﻿{
+  "name": "musicplayer",
+  "version": "1.0.0",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "wait-and-start": "node wait-api.js"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0"
+  }
+}

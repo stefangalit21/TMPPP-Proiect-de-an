@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "u08zYxpdEGXh+9YGwmX9cuBmJeSVcAWEN2KYpwx3KjE=",
+  "Source": "MusicPlayer.Web",
+  "BasePath": "_content/MusicPlayer.Web",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
